@@ -53,7 +53,8 @@
     .user .bubble{background:var(--user);color:var(--user-text);border-color:transparent;border-bottom-right-radius:4px}
     .assistant .bubble{border-bottom-left-radius:4px}
     .bubble p{margin:0}.bubble p+p{margin-top:6px}
-    .meta{font-size:11px;color:var(--muted);margin:4px 5px 0}.user .meta{text-align:right}
+    .meta{font-size:11px;color:var(--muted);margin:4px 5px 0;line-height:1.3;font-variant-numeric:tabular-nums;letter-spacing:.01em}.user .meta{text-align:right}
+    .card-time{font-size:11px;color:var(--muted);text-align:right;margin-top:14px;line-height:1.3;font-variant-numeric:tabular-nums;letter-spacing:.01em}.result-card .card-time{margin-top:16px}.upload-card .card-time{margin-top:12px}
     .holiday-line{color:var(--accent);font-weight:700}
     .upload-card,.result-card{align-self:stretch;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 2px;margin:4px 0 6px;animation:appear .25s ease-out}
     .card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
@@ -304,6 +305,7 @@
   function localDate(y,m,d){return new Date(y,m-1,d,12,0,0)}
   function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
   function fmtDate(d){return (d.getMonth()+1)+'月'+d.getDate()+'日'}
+  function fmtTimestamp(d){var dt=d||new Date();return (dt.getMonth()+1)+'/'+dt.getDate()+' '+pad(dt.getHours())+':'+pad(dt.getMinutes())}
   function fmtPeriod(a,b){return a.getMonth()===b.getMonth()?((a.getMonth()+1)+'月'+a.getDate()+'日〜'+b.getDate()+'日'):(fmtDate(a)+'〜'+fmtDate(b))}
   function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
   function wait(ms){return new Promise(function(resolve){setTimeout(resolve,ms)})}
@@ -344,7 +346,7 @@
     if(a.getFullYear()!==y1||a.getMonth()!==mo1-1||a.getDate()!==d1||b.getFullYear()!==y2||b.getMonth()!==mo2-1||b.getDate()!==d2||b<a)return null;
     return {start:a,end:b,clamps:clamps};
   }
-  function addMessage(role,html){var el=document.createElement('div');el.className='message '+role;el.innerHTML='<div class="bubble">'+html+'</div>';thread.appendChild(el);return el}
+  function addMessage(role,html,at){var el=document.createElement('div');el.className='message '+role;el.innerHTML='<div class="bubble">'+html+'</div><div class="meta" aria-label="送信時刻">'+esc(fmtTimestamp(at))+'</div>';thread.appendChild(el);return el}
   function scrollRequestIntoView(el){requestAnimationFrame(function(){var top=Math.max(0,el.offsetTop-12);chat.scrollTo({top:top,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})})}
   function scrollResultTop(el){requestAnimationFrame(function(){chat.scrollTo({top:Math.max(0,el.offsetTop-12),behavior:'auto'})})}
   function clearThread(){thread.innerHTML='';thread.appendChild(intro);intro.hidden=false;state.period=null;state.holidays=[];state.requestId++;pendingFiles=[];renderAttachPreview()}
@@ -512,7 +514,7 @@
   }
   function renderBusyCard(id,period,title){
     var card=document.createElement('section');card.className='upload-card busy-card';card.dataset.request=String(id);
-    card.innerHTML='<div class="card-heading"><h2>'+esc(title)+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="busy-status">ファイルの日付範囲を判定して計算しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p>';
+    card.innerHTML='<div class="card-heading"><h2>'+esc(title)+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="busy-status">ファイルの日付範囲を判定して計算しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p><div class="card-time" aria-label="表示時刻">'+esc(fmtTimestamp())+'</div>';
     return card;
   }
   async function calculateFromAttached(id,period,holidays,isTaka,files,busyCard){
@@ -533,7 +535,7 @@
       console.error(err);
       var message=err&&err.message?err.message:'ファイルを読み取れませんでした';
       if(busyCard){
-        busyCard.innerHTML='<div class="card-heading"><h2>添付ファイルで計算できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><p class="notice">ファイルを確認して、もう一度クリップボタンから添付して期間と一緒に送信してください。</p>';
+        busyCard.innerHTML='<div class="card-heading"><h2>添付ファイルで計算できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><p class="notice">ファイルを確認して、もう一度クリップボタンから添付して期間と一緒に送信してください。</p><div class="card-time" aria-label="表示時刻">'+esc(fmtTimestamp())+'</div>';
         scrollResultTop(busyCard);
       }
     }
@@ -599,7 +601,7 @@
     if(isTaka&&autoReady){
       autoHtml='<div class="or-divider">または</div><div class="auto-box"><span class="auto-box-title">ファイルがない場合 — 自動取得で計算</span><span class="auto-box-help">ファイルを添付せず、GoSnappyから自動で取得して計算します。ファイルが添付されている場合は、そちらが優先されるため、このボタンは使いません。</span><button type="button" class="secondary" id="auto'+id+'">ファイルなしで自動取得する</button><span class="status" id="autoStatus'+id+'" style="margin-left:9px"></span></div>';
     }
-    card.innerHTML='<div class="card-heading"><h2>'+esc(isTaka?'Ramen Taka':'suzuya')+(isTaka?' — ファイル優先／なければ自動取得':' — Excelファイルで計算')+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div>'+priorityHtml+note+'<div class="upload-grid">'+boxes+'</div>'+(isTaka?'<p class="notice"><strong>集計ルール：</strong>給与期間は各CSVの右端「Total」列をそのまま使用します。</p>':'')+'<div class="action-row"><button type="button" class="primary" id="calc'+id+'" disabled>ファイルで計算する</button><span class="status" id="status'+id+'">ファイルを選択すると「ファイルで計算する」が押せます</span></div>'+autoHtml;
+    card.innerHTML='<div class="card-heading"><h2>'+esc(isTaka?'Ramen Taka':'suzuya')+(isTaka?' — ファイル優先／なければ自動取得':' — Excelファイルで計算')+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div>'+priorityHtml+note+'<div class="upload-grid">'+boxes+'</div>'+(isTaka?'<p class="notice"><strong>集計ルール：</strong>給与期間は各CSVの右端「Total」列をそのまま使用します。</p>':'')+'<div class="action-row"><button type="button" class="primary" id="calc'+id+'" disabled>ファイルで計算する</button><span class="status" id="status'+id+'">ファイルを選択すると「ファイルで計算する」が押せます</span></div>'+autoHtml+'<div class="card-time" aria-label="表示時刻">'+esc(fmtTimestamp())+'</div>';
     setTimeout(function(){wireCard(id,isTaka,period,holidays)},0);return card;
   }
   function wireCard(id,isTaka,period,holidays){
@@ -631,7 +633,7 @@
 
   function renderAutoCard(id,period){
     var card=document.createElement('section');card.className='upload-card busy-card';card.dataset.request=String(id);
-    card.innerHTML='<div class="card-heading"><h2>ファイルなし — 自動取得で計算中</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice" style="margin:0 0 12px">ファイルが添付されなかったため、GoSnappyから自動取得して計算します。</p><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="auto-status">勤務データを取得しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p>';
+    card.innerHTML='<div class="card-heading"><h2>ファイルなし — 自動取得で計算中</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice" style="margin:0 0 12px">ファイルが添付されなかったため、GoSnappyから自動取得して計算します。</p><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="auto-status">勤務データを取得しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p><div class="card-time" aria-label="表示時刻">'+esc(fmtTimestamp())+'</div>';
     return card;
   }
   var CORS_PROXY_BASE='https://corsproxy.io/?url=';
@@ -692,7 +694,7 @@
       card.remove();renderResults(result,period,holidays);
     }catch(err){
       if(id!==state.requestId)return;console.error(err);var message=err&&err.message?err.message:'勤務データを取得できませんでした。';
-      card.innerHTML='<div class="card-heading"><h2>自動取得を完了できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><div class="action-row"><button type="button" class="primary auto-fallback">手動ファイルを選ぶ</button></div>';
+      card.innerHTML='<div class="card-heading"><h2>自動取得を完了できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><div class="action-row"><button type="button" class="primary auto-fallback">手動ファイルを選ぶ</button></div><div class="card-time" aria-label="表示時刻">'+esc(fmtTimestamp())+'</div>';
       card.querySelector('.auto-fallback').addEventListener('click',function(){var manual=renderUploadCard(id,period,holidays,'自動取得を完了できなかったため、手動ファイルで計算できます。');card.replaceWith(manual)});
     }
   }
@@ -804,6 +806,7 @@
       html+='</div></div>';
     }
     if(result.warnings&&result.warnings.length)html+='<div class="warnings"><strong>確認事項</strong><ul>'+result.warnings.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul></div>';
+    html+='<div class="card-time" aria-label="結果表示時刻">'+esc(fmtTimestamp())+'</div>';
     card.innerHTML=html;thread.appendChild(card);scrollResultTop(card);
   }
 
