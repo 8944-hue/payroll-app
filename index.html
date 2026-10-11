@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <title>給料計算（HTML版）</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#0b100e; --panel:#131916; --panel-2:#1b2420; --text:#edf4f0; --muted:#9aa8a0;
+      --line:#2a352f; --accent:#5ed0a5; --accent-2:#193c30; --accent-text:#c8f7e6;
+      --user:#d5f6e8; --user-text:#10221b; --danger:#ff8585; --warning:#e9bb5a;
+      --shadow:0 22px 60px rgba(0,0,0,.32); --focus:#6fe0b7;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        color-scheme:dark;
+        --bg:#111714; --panel:#19211d; --panel-2:#222d28; --text:#f2f7f4; --muted:#aab7b0;
+        --line:#334139; --accent:#6cdbb2; --accent-2:#1f4537; --accent-text:#d6faec;
+        --user:#ddf8ed; --user-text:#10221b; --danger:#ff9090; --warning:#efc36b;
+        --shadow:0 18px 50px rgba(0,0,0,.25); --focus:#7ae6bf;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;overscroll-behavior:none}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:15px;line-height:1.65;overflow:hidden}
+    button,input{font:inherit}
+    button{color:inherit}
+    .app{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;max-width:920px;margin:0 auto;background:var(--panel);box-shadow:var(--shadow)}
+    .storebar{padding:12px 18px 10px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:center;gap:10px;z-index:3}
+    .store-label{font-size:12px;color:var(--muted);font-weight:700;margin-right:2px}
+    .store-tabs{display:flex;gap:7px;flex:1}
+    .store-tab{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 13px;font-weight:700;cursor:pointer;transition:background .18s,color .18s,border-color .18s}
+    .store-tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#071b14}
+    .clear-btn,.settings-btn{border:0;background:transparent;color:var(--muted);font-size:13px;padding:7px 8px;cursor:pointer;white-space:nowrap}
+    .settings-btn{color:var(--text)}
+    .settings-btn[hidden]{display:none}
+    .settings-btn:hover,.clear-btn:hover{color:var(--accent)}
+    .chat{overflow-y:auto;overscroll-behavior:contain;scroll-padding:18px 0 28px;padding:22px 18px 0;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+    .thread{max-width:720px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:14px;padding-bottom:20px}
+    .intro{margin:auto 0;align-self:center;text-align:center;max-width:560px;padding:24px 8px}
+    .intro h1{font-family:Georgia,"Yu Mincho",serif;font-size:clamp(27px,5vw,40px);line-height:1.2;margin:0 0 13px;font-weight:600;letter-spacing:-.02em}
+    .intro p{color:var(--muted);margin:0 auto;max-width:480px}
+    .steps{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:21px}
+    .step{font-size:12px;border:1px solid var(--line);padding:5px 9px;border-radius:999px;color:var(--muted)}
+    .message{max-width:min(86%,620px);animation:appear .2s ease-out}
+    .message.user{align-self:flex-end}
+    .message.assistant{align-self:flex-start}
+    .bubble{padding:11px 14px;border-radius:13px;background:var(--panel-2);border:1px solid var(--line)}
+    .user .bubble{background:var(--user);color:var(--user-text);border-color:transparent;border-bottom-right-radius:4px}
+    .assistant .bubble{border-bottom-left-radius:4px}
+    .bubble p{margin:0}.bubble p+p{margin-top:6px}
+    .meta{font-size:11px;color:var(--muted);margin:4px 5px 0}.user .meta{text-align:right}
+    .holiday-line{color:var(--accent);font-weight:700}
+    .upload-card,.result-card{align-self:stretch;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 2px;margin:4px 0 6px;animation:appear .25s ease-out}
+    .card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+    .card-heading h2{font-family:Georgia,"Yu Mincho",serif;font-size:21px;line-height:1.35;margin:0;font-weight:600}
+    .period-chip{white-space:nowrap;color:var(--accent);font-size:12px;font-weight:800;padding-top:3px}
+    .upload-grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .filebox{position:relative;display:block;border:1px dashed var(--line);background:var(--panel-2);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .18s,background .18s}
+    .filebox:hover{border-color:var(--accent)}
+    .filebox input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+    .file-title{display:block;font-weight:800;margin-bottom:2px}
+    .file-help{display:block;font-size:12px;color:var(--muted)}
+    .file-name{display:block;font-size:12px;color:var(--accent);font-weight:700;margin-top:5px;overflow-wrap:anywhere}
+    .notice{font-size:12px;color:var(--muted);margin:11px 0 0}
+    .notice strong{color:var(--text)}
+    .priority-box{border:1px solid var(--accent);background:var(--accent-2);color:var(--accent-text);border-radius:10px;padding:12px 13px;margin-bottom:14px;font-size:13px;line-height:1.6}
+    .priority-box strong{color:#fff}
+    .priority-box ol{margin:6px 0 0;padding-left:20px}
+    .priority-box li+li{margin-top:2px}
+    .filebox.has-file{border-color:var(--accent);border-style:solid;background:color-mix(in srgb,var(--accent) 10%,var(--panel-2))}
+    .or-divider{display:flex;align-items:center;gap:10px;margin:18px 0 4px;color:var(--muted);font-size:12px;font-weight:700}
+    .or-divider::before,.or-divider::after{content:"";height:1px;background:var(--line);flex:1}
+    .auto-box{border:1px solid var(--line);border-radius:10px;padding:13px;background:var(--panel-2)}
+    .auto-box-title{font-weight:800;display:block;margin-bottom:2px}
+    .auto-box-help{font-size:12px;color:var(--muted);display:block;margin-bottom:10px}
+    .action-row{display:flex;gap:9px;align-items:center;margin-top:14px;flex-wrap:wrap}
+    .primary{border:0;background:var(--accent);color:#071b14;font-weight:800;padding:10px 18px;border-radius:8px;cursor:pointer;min-width:128px}
+    .primary:disabled{opacity:.45;cursor:not-allowed}
+    .secondary{border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:800;padding:10px 16px;border-radius:8px;cursor:pointer}
+    .secondary:disabled{opacity:.45;cursor:not-allowed}
+    .status{font-size:12px;color:var(--muted)}
+    .status.error{color:var(--danger)}
+    .result-intro{font-family:Georgia,"Yu Mincho",serif;font-size:23px;line-height:1.42;margin:0 0 8px;font-weight:600}
+    .result-summary{color:var(--muted);margin:0 0 18px;font-size:13px}
+    .results{display:grid;gap:9px}
+    .group-heading{font-family:Georgia,"Yu Mincho",serif;font-size:17px;line-height:1.4;margin:22px 0 4px;font-weight:600;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+    .group-heading:first-child{margin-top:0}
+    .group-note{font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:12px;color:var(--muted);font-weight:400}
+    .group-section{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+    .group-section .group-heading{margin-top:0}
+    .employee{background:var(--panel-2);border-radius:10px;padding:13px 14px}
+    .employee-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+    .employee-title{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;min-width:0}
+    .employee-name{font-weight:800;font-size:16px}.work-days{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}.hours{font-variant-numeric:tabular-nums;font-weight:800;color:var(--accent);font-size:18px}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .metric{border-top:1px solid var(--line);padding-top:7px}.metric-label{font-size:10px;color:var(--muted);display:block}.metric-value{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;display:block;margin-top:1px}
+    .eligible{color:var(--accent)}.not-eligible{color:var(--muted)}
+    .holiday-detail{margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+    .holiday-title{font-size:11px;color:var(--accent);font-weight:800;margin:0 0 7px}
+    .warnings{margin-top:13px;padding:11px 13px;background:color-mix(in srgb,var(--warning) 10%,var(--panel));border-radius:8px;font-size:12px;color:var(--warning)}
+    .warnings ul{margin:5px 0 0;padding-left:18px}
+    .busy-card{padding:18px 2px}
+    .busy-line{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:700}
+    .spinner{width:17px;height:17px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto}
+    .busy-note{margin:7px 0 0 27px;font-size:12px;color:var(--muted)}
+    .settings-backdrop{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.66)}
+    .settings-backdrop[hidden]{display:none}
+    .settings-panel{width:min(100%,520px);max-height:min(760px,calc(100dvh - 36px));overflow-y:auto;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:14px;padding:20px}
+    .settings-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .settings-head h2{font-family:Georgia,"Yu Mincho",serif;font-size:23px;line-height:1.25;margin:0;font-weight:600}
+    .close-settings{border:0;background:transparent;color:var(--muted);padding:3px;cursor:pointer}
+    .settings-form{display:grid;gap:13px}
+    .settings-form label{display:grid;gap:5px;font-size:12px;font-weight:800;color:var(--muted)}
+    .settings-form input{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);padding:10px 11px;outline:0}
+    .settings-form input:focus{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 18%,transparent)}
+    .settings-divider{height:1px;background:var(--line);margin:2px 0}
+    .settings-subhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;font-size:14px}
+    .memory-badge{font-size:11px;color:var(--accent);font-weight:800}
+    .remember-row{display:flex!important;align-items:center;gap:9px;grid-template-columns:none!important;font-size:13px!important;font-weight:700!important;color:var(--text)!important;cursor:pointer;padding:2px 0}
+    .remember-row input[type="checkbox"]{width:18px;height:18px;flex:0 0 auto;accent-color:var(--accent);cursor:pointer;margin:0}
+    .security-note{margin:0;padding:11px 12px;background:var(--accent-2);color:var(--accent-text);border-radius:8px;font-size:12px}
+    .settings-actions{display:flex;align-items:center;gap:10px;margin-top:3px}
+    .settings-feedback{font-size:12px;color:var(--accent)}
+    .composer-shell{padding:9px 14px calc(9px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel);z-index:4}
+    .attach-preview{max-width:720px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:6px}
+    .attach-preview[hidden]{display:none}
+    .file-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-2);color:var(--accent-text);border:1px solid var(--line);border-radius:999px;padding:4px 5px 4px 10px;font-size:12px;max-width:100%}
+    .file-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;font-weight:700}
+    .file-chip-remove{border:0;background:transparent;color:inherit;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;cursor:pointer;padding:0}
+    .file-chip-remove svg{width:13px;height:13px}
+    .attach-note{font-size:11px;color:var(--muted);align-self:center}
+    .composer{max-width:720px;margin:0 auto;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:end;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:6px}
+    .composer:focus-within{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 20%,transparent)}
+    .voice,.attach,.send{width:40px;height:40px;border:0;background:transparent;border-radius:8px;display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+    .attach:hover,.voice:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+    .attach.has-files{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+    .voice.active{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+    .send{background:var(--accent);color:#071b14}.send:disabled{opacity:.38;cursor:not-allowed}
+    .composer input{border:0;outline:0;background:transparent;color:var(--text);min-width:0;padding:8px 3px;height:40px}
+    .composer input::placeholder{color:var(--muted)}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    @keyframes appear{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:600px){
+      .storebar{padding:9px 8px 8px;gap:5px}.store-label{display:none}.store-tabs{gap:5px;min-width:0}.store-tab{padding:7px 8px;font-size:12px}.clear-btn,.settings-btn{font-size:12px;padding:6px 3px}
+      .chat{padding:16px 12px 0}.thread{gap:12px;padding-bottom:16px}.message{max-width:92%}.bubble{padding:10px 12px}
+      .upload-card,.result-card{padding:17px 0}.card-heading{display:block}.period-chip{display:block;margin-top:4px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .composer-shell{padding:7px 8px calc(7px + env(safe-area-inset-bottom))}.result-intro{font-size:20px}.intro{padding:18px 5px}.settings-panel{padding:17px}
+    }
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="storebar" aria-label="店舗選択">
+    <span class="store-label">店舗</span>
+    <div class="store-tabs">
+      <button class="store-tab" data-store="taka" aria-pressed="true">Ramen Taka</button>
+      <button class="store-tab" data-store="suzuya" aria-pressed="false">suzuya</button>
+    </div>
+    <button class="settings-btn" id="settingsBtn" type="button" aria-haspopup="dialog" hidden>接続設定</button>
+    <button class="clear-btn" id="clearBtn" type="button">最初から</button>
+  </header>
+
+  <main class="chat" id="chat" aria-live="polite">
+    <div class="thread" id="thread">
+      <section class="intro" id="intro">
+        <h1>計算する期間を入力してください</h1>
+        <p id="introDesc">店舗を選び、「9.1-9.10」や「4月1日から4月30日」のように期間を送信してください。クリップボタンからファイルを一緒に添付できます（複数可）。ファイルから計算するか、Snappyから自動で計算します。</p>
+        <div class="steps" aria-label="使い方"><span class="step">1 店舗を選ぶ</span><span class="step">2 クリップでファイルを添付（任意・複数可）</span><span class="step">3 期間を一緒に送信</span></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="composer-shell">
+    <div class="attach-preview" id="attachPreview" hidden></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <button class="voice" id="voiceBtn" type="button" aria-label="音声で入力">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"></path></svg>
+      </button>
+      <button class="attach" id="attachBtn" type="button" aria-label="ファイルを添付">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+      </button>
+      <input id="attachInput" type="file" multiple accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden aria-label="添付ファイルを選択" />
+      <label class="sr-only" for="messageInput">計算期間</label>
+      <input id="messageInput" inputmode="text" placeholder="例：9.1-9.10" aria-label="計算期間を入力" />
+      <button class="send" id="sendBtn" type="submit" aria-label="送信">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"></path><path d="m22 2-7 20-4-9-9-4Z"></path></svg>
+      </button>
+    </form>
+  </footer>
+</div>
+
+<div class="settings-backdrop" id="settingsBackdrop" hidden>
+  <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-head">
+      <h2 id="settingsTitle">接続設定</h2>
+      <button class="close-settings" id="closeSettings" type="button" aria-label="接続設定を閉じる">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <form class="settings-form" id="settingsForm" autocomplete="off">
+      <div class="settings-subhead"><strong>Apify</strong><span class="memory-badge" id="persistBadge">一時的に保持</span></div>
+      <label>APIトークン
+        <input id="apifyToken" aria-label="Apify APIトークン" type="password" autocomplete="new-password" spellcheck="false" placeholder="apify_api_..." />
+      </label>
+      <label>Actor ID
+        <input id="actorId" aria-label="Apify Actor ID" type="text" autocomplete="off" spellcheck="false" value="LyyngGsr4YqnznL6i" readonly aria-readonly="true" />
+      </label>
+      <div class="settings-divider"></div>
+      <div class="settings-subhead"><strong>GoSnappy</strong></div>
+      <label>accountName
+        <input id="accountName" aria-label="GoSnappy accountName" type="text" autocomplete="off" spellcheck="false" />
+      </label>
+      <label>password
+        <input id="goPassword" aria-label="GoSnappy password" type="password" autocomplete="new-password" spellcheck="false" />
+      </label>
+      <label>storeId
+        <input id="storeId" aria-label="GoSnappy storeId" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="remember-row" for="rememberSettings">
+        <input id="rememberSettings" type="checkbox" />
+        <span>このブラウザに保存する</span>
+      </label>
+      <p class="security-note">このブラウザを使う他の人がトークンを見られる可能性があります。共有端末では保存しないでください。保存しない場合は、このページを開いている間だけ保持され、ページを閉じると消えます。Actor IDは変更できません。</p>
+      <div class="settings-actions">
+        <button class="primary" type="submit">設定を適用</button>
+        <span class="settings-feedback" id="settingsFeedback" role="status"></span>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var STORAGE_KEY='payroll-html-settings-v1';
+  var APIFY_ACTOR_ID='LyyngGsr4YqnznL6i';
+  function loadPersistedSettings(){
+    try{
+      var raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw)return null;
+      var parsed=JSON.parse(raw);
+      if(!parsed||typeof parsed!=='object')return null;
+      return {
+        apifyToken:typeof parsed.apifyToken==='string'?parsed.apifyToken:'',
+        actorId:APIFY_ACTOR_ID,
+        accountName:typeof parsed.accountName==='string'?parsed.accountName:'',
+        password:typeof parsed.password==='string'?parsed.password:'',
+        storeId:typeof parsed.storeId==='string'?parsed.storeId:''
+      };
+    }catch(e){return null}
+  }
+  function persistSettingsToStorage(settings){
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings));return true}catch(e){return false}
+  }
+  function clearPersistedSettings(){
+    try{localStorage.removeItem(STORAGE_KEY)}catch(e){}
+  }
+  function hasPersistedSettings(){
+    try{return localStorage.getItem(STORAGE_KEY)!=null}catch(e){return false}
+  }
+  var persistedSettings=loadPersistedSettings();
+  var state={store:'taka',period:null,holidays:[],requestId:0,persisted:!!persistedSettings,settings:persistedSettings||{apifyToken:'',actorId:APIFY_ACTOR_ID,accountName:'',password:'',storeId:''}};
+  var chat=document.getElementById('chat'),thread=document.getElementById('thread'),intro=document.getElementById('intro');
+  var input=document.getElementById('messageInput'),composer=document.getElementById('composer'),voiceBtn=document.getElementById('voiceBtn');
+  var attachBtn=document.getElementById('attachBtn'),attachInput=document.getElementById('attachInput'),attachPreview=document.getElementById('attachPreview');
+  var pendingFiles=[];
+  var settingsBackdrop=document.getElementById('settingsBackdrop'),settingsForm=document.getElementById('settingsForm');
+  var CONV=[0,.02,.04,.05,.07,.09,.10,.12,.14,.15,.17,.19,.20,.22,.24,.25,.27,.29,.30,.32,.34,.35,.37,.39,.40,.42,.44,.45,.47,.49,.50,.52,.54,.55,.57,.59,.60,.62,.64,.65,.67,.69,.70,.72,.74,.75,.77,.79,.80,.82,.84,.85,.87,.89,.90,.92,.94,.95,.97,.99];
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function pad(n){return String(n).padStart(2,'0')}
+  function key(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+  function localDate(y,m,d){return new Date(y,m-1,d,12,0,0)}
+  function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x}
+  function fmtDate(d){return (d.getMonth()+1)+'月'+d.getDate()+'日'}
+  function fmtPeriod(a,b){return a.getMonth()===b.getMonth()?((a.getMonth()+1)+'月'+a.getDate()+'日〜'+b.getDate()+'日'):(fmtDate(a)+'〜'+fmtDate(b))}
+  function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+  function wait(ms){return new Promise(function(resolve){setTimeout(resolve,ms)})}
+  function sameDay(a,b){return key(a)===key(b)}
+  function nthWeekday(y,m,weekday,n){var d=localDate(y,m,1),delta=(weekday-d.getDay()+7)%7;return localDate(y,m,1+delta+7*(n-1))}
+  function easter(y){var a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;return localDate(y,mo,day)}
+  function holidaysFor(y){
+    var e=easter(y),victoria=localDate(y,5,24);while(victoria.getDay()!==1)victoria=addDays(victoria,-1);
+    return [
+      ['New Year’s Day',localDate(y,1,1)],['Family Day',nthWeekday(y,2,1,3)],['Good Friday',addDays(e,-2)],
+      ['Victoria Day',victoria],['Canada Day',localDate(y,7,1)],['B.C. Day',nthWeekday(y,8,1,1)],
+      ['Labour Day',nthWeekday(y,9,1,1)],['National Day for Truth and Reconciliation',localDate(y,9,30)],
+      ['Thanksgiving Day',nthWeekday(y,10,1,2)],['Remembrance Day',localDate(y,11,11)],['Christmas Day',localDate(y,12,25)]
+    ];
+  }
+  function holidaysBetween(a,b){var out=[];for(var y=a.getFullYear();y<=b.getFullYear();y++){holidaysFor(y).forEach(function(h){if(h[1]>=a&&h[1]<=b)out.push({name:h[0],date:h[1]})})}return out.sort(function(x,y){return x.date-y.date})}
+  function daysInMonth(y,m){return new Date(y,m,0).getDate()}
+  function parsePeriod(text){
+    var cleaned=String(text).replace(/[０-９]/g,function(c){return String('０１２３４５６７８９'.indexOf(c))}).replace(/[．。]/g,'.').replace(/から/g,'-').replace(/[〜～ー―−–—~－]/g,'-').replace(/まで/g,' ').replace(/[　]/g,' ');
+    var m=cleaned.match(/(?:(20\d{2})\s*[.\/\-年])?\s*(\d{1,2})\s*[.\/月]\s*(\d{1,2})\s*日?\s*-\s*(?:(20\d{2})\s*[.\/\-年])?\s*(?:(\d{1,2})\s*[.\/月])?\s*(\d{1,2})\s*日?/);
+    if(!m)return null;
+    var now=new Date(),y1=+(m[1]||now.getFullYear()),mo1=+m[2],d1=+m[3],y2=+(m[4]||y1),mo2=+(m[5]||mo1),d2=+m[6];
+    if(mo1<1||mo1>12||mo2<1||mo2>12||d1<1||d2<1)return null;
+    if(!m[4]&&mo2<mo1)y2=y1+1;
+    var clamps=[];
+    function clampDay(y,mo,d){
+      var max=daysInMonth(y,mo);
+      if(d>max){
+        var exists=clamps.some(function(c){return c.month===mo&&c.originalDay===d&&c.clampedDay===max});
+        if(!exists)clamps.push({month:mo,originalDay:d,clampedDay:max});
+        return max;
+      }
+      return d;
+    }
+    d1=clampDay(y1,mo1,d1);
+    d2=clampDay(y2,mo2,d2);
+    var a=localDate(y1,mo1,d1),b=localDate(y2,mo2,d2);
+    if(a.getFullYear()!==y1||a.getMonth()!==mo1-1||a.getDate()!==d1||b.getFullYear()!==y2||b.getMonth()!==mo2-1||b.getDate()!==d2||b<a)return null;
+    return {start:a,end:b,clamps:clamps};
+  }
+  function addMessage(role,html){var el=document.createElement('div');el.className='message '+role;el.innerHTML='<div class="bubble">'+html+'</div>';thread.appendChild(el);return el}
+  function scrollRequestIntoView(el){requestAnimationFrame(function(){var top=Math.max(0,el.offsetTop-12);chat.scrollTo({top:top,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})})}
+  function scrollResultTop(el){requestAnimationFrame(function(){chat.scrollTo({top:Math.max(0,el.offsetTop-12),behavior:'auto'})})}
+  function clearThread(){thread.innerHTML='';thread.appendChild(intro);intro.hidden=false;state.period=null;state.holidays=[];state.requestId++;pendingFiles=[];renderAttachPreview()}
+  function renderAttachPreview(){
+    if(!attachPreview)return;
+    if(!pendingFiles.length){attachPreview.hidden=true;attachPreview.innerHTML='';if(attachBtn)attachBtn.classList.remove('has-files');return}
+    attachPreview.hidden=false;if(attachBtn)attachBtn.classList.add('has-files');
+    attachPreview.innerHTML=pendingFiles.map(function(f,i){return '<span class="file-chip"><span class="file-chip-name" title="'+esc(f.name)+'">'+esc(f.name)+'</span><button type="button" class="file-chip-remove" data-remove="'+i+'" aria-label="'+esc(f.name)+'を取り除く"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></span>'}).join('')+'<span class="attach-note">'+pendingFiles.length+'件添付中 — 期間と一緒に送信されます</span>';
+    attachPreview.querySelectorAll('[data-remove]').forEach(function(btn){btn.addEventListener('click',function(){var idx=+btn.getAttribute('data-remove');pendingFiles.splice(idx,1);renderAttachPreview();input.focus()})});
+  }
+  function addPendingFiles(fileList){
+    var incoming=Array.from(fileList||[]);
+    incoming.forEach(function(f){
+      var dup=pendingFiles.some(function(p){return p.name===f.name&&p.size===f.size&&p.lastModified===f.lastModified});
+      if(!dup)pendingFiles.push(f);
+    });
+    renderAttachPreview();
+  }
+  function updatePersistBadge(){
+    var badge=document.getElementById('persistBadge');
+    if(badge)badge.textContent=state.persisted?'このブラウザに保存済み':'一時的に保持';
+  }
+  function openSettings(){
+    document.getElementById('apifyToken').value=state.settings.apifyToken;
+    document.getElementById('actorId').value=state.settings.actorId;
+    document.getElementById('accountName').value=state.settings.accountName;
+    document.getElementById('goPassword').value=state.settings.password;
+    document.getElementById('storeId').value=state.settings.storeId;
+    var rememberEl=document.getElementById('rememberSettings');
+    if(rememberEl)rememberEl.checked=state.persisted||hasPersistedSettings();
+    updatePersistBadge();
+    document.getElementById('settingsFeedback').textContent='';settingsBackdrop.hidden=false;
+    requestAnimationFrame(function(){document.getElementById('apifyToken').focus()});
+  }
+  function closeSettings(){settingsBackdrop.hidden=true;var sb=document.getElementById('settingsBtn');if(sb&&!sb.hidden)sb.focus();else input.focus()}
+  document.getElementById('settingsBtn').addEventListener('click',openSettings);
+  function openSettingsFromHash(){if(window.location.hash==='#settings'&&settingsBackdrop.hidden)openSettings()}
+  window.addEventListener('hashchange',openSettingsFromHash);
+  openSettingsFromHash();
+  document.getElementById('closeSettings').addEventListener('click',closeSettings);
+  settingsBackdrop.addEventListener('mousedown',function(e){if(e.target===settingsBackdrop)closeSettings()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!settingsBackdrop.hidden)closeSettings()});
+  settingsForm.addEventListener('submit',function(e){
+    e.preventDefault();state.settings={
+      apifyToken:document.getElementById('apifyToken').value.trim(),
+      actorId:APIFY_ACTOR_ID,
+      accountName:document.getElementById('accountName').value.trim(),
+      password:document.getElementById('goPassword').value,
+      storeId:document.getElementById('storeId').value.trim()
+    };
+    var rememberEl=document.getElementById('rememberSettings');
+    var shouldPersist=!!(rememberEl&&rememberEl.checked);
+    if(shouldPersist){
+      if(persistSettingsToStorage(state.settings)){
+        state.persisted=true;
+        document.getElementById('settingsFeedback').textContent='このブラウザに保存しました';
+      }else{
+        state.persisted=false;
+        document.getElementById('settingsFeedback').textContent='保存できませんでした。このページ内でのみ保持します';
+      }
+    }else{
+      clearPersistedSettings();
+      var wasPersisted=state.persisted;
+      state.persisted=false;
+      document.getElementById('settingsFeedback').textContent=wasPersisted?'保存を解除し、このページ内で設定を適用しました':'このページ内で設定を適用しました';
+    }
+    updatePersistBadge();
+    setTimeout(function(){if(!settingsBackdrop.hidden)closeSettings()},600);
+  });
+
+  var TAKA_INTRO='店舗を選び、「9.1-9.10」や「4月1日から4月30日」のように期間を送信してください。クリップボタンからファイルを一緒に添付できます（複数可）。ファイルから計算するか、Snappyから自動で計算します。';
+  var SUZUYA_INTRO='Excel出勤簿を添付して、期間を送信してください。';
+  document.querySelectorAll('.store-tab').forEach(function(btn){btn.addEventListener('click',function(){
+    state.store=btn.dataset.store;document.querySelectorAll('.store-tab').forEach(function(b){b.setAttribute('aria-pressed',String(b===btn))});
+    var introDesc=document.getElementById('introDesc');if(introDesc)introDesc.textContent=state.store==='suzuya'?SUZUYA_INTRO:TAKA_INTRO;
+    input.placeholder=state.store==='taka'?'例：9.1-9.10':'例：9.1-9.15';input.focus();
+  })});
+  document.getElementById('clearBtn').addEventListener('click',function(){clearThread();input.value='';input.focus()});
+
+  if(attachBtn&&attachInput){
+    attachBtn.addEventListener('click',function(){attachInput.click()});
+    attachInput.addEventListener('change',function(){addPendingFiles(attachInput.files);attachInput.value='';input.focus()});
+  }
+  composer.addEventListener('submit',function(e){e.preventDefault();var text=input.value.trim();if(!text)return;submitRequest(text)});
+  function submitRequest(text){
+    var p=parsePeriod(text);if(!p){var bad=addMessage('assistant','<p>期間を確認できませんでした。「9.1-9.10」または「4月1日から4月30日」のように入力してください。</p>');scrollRequestIntoView(bad);return}
+    var attached=pendingFiles.slice();pendingFiles=[];renderAttachPreview();
+    intro.hidden=true;state.period=p;state.holidays=holidaysBetween(p.start,p.end);state.requestId++;
+    var id=state.requestId,holidays=state.holidays.slice(),isTaka=state.store==='taka';
+    var attachHtml=attached.length?'<p style="margin-top:6px;font-size:12px;opacity:.85">添付ファイル（'+attached.length+'件）：'+attached.map(function(f){return esc(f.name)}).join('、')+'</p>':'';
+    var user=addMessage('user','<p>'+esc(text)+'</p>'+attachHtml);input.value='';
+    var clampText=(p.clamps&&p.clamps.length)?p.clamps.map(function(c){return '<p>'+esc(c.month+'月'+c.originalDay+'日は存在しないため、'+c.month+'月'+c.clampedDay+'日として計算します。')+'</p>'}).join(''):'';
+    var holidayText=holidays.length?'<p class="holiday-line">祝日：'+holidays.map(function(h){return esc(h.name)+'（'+fmtDate(h.date)+'）'}).join('、')+'</p>':'<p>期間内に対象の祝日はありません。</p>';
+    var hasToken=Boolean(state.settings.apifyToken),autoReady=hasToken&&state.settings.actorId&&state.settings.accountName&&state.settings.password&&state.settings.storeId;
+    if(attached.length){
+      addMessage('assistant','<p>'+fmtPeriod(p.start,p.end)+'分を計算します。</p>'+clampText+holidayText+'<p>添付された'+attached.length+'件のファイルから計算します。ファイルの日付範囲を自動で判定し、給与期間用・祝日判定用に振り分けます。</p>');
+      var busy=renderBusyCard(id,p,'添付ファイルで計算中');
+      thread.appendChild(busy);
+      scrollRequestIntoView(user);
+      calculateFromAttached(id,p,holidays,isTaka,attached,busy);
+      return;
+    }
+    if(isTaka){
+      if(autoReady){
+        addMessage('assistant','<p>'+fmtPeriod(p.start,p.end)+'分を計算します。</p>'+clampText+holidayText+'<p>ファイルが添付されていないため、自動取得で計算します。</p>');
+        var autoCard=renderAutoCard(id,p);
+        thread.appendChild(autoCard);
+        scrollRequestIntoView(user);
+        startAutoCalculation(id,p,holidays,autoCard);
+        return;
+      }
+      var missingNote=hasToken?'自動取得に必要な設定が未入力のため、自動取得できませんでした。下でファイルで計算してください。':'設定が未入力のため、自動取得は使えません。下でファイルで計算してください。';
+      addMessage('assistant','<p>'+fmtPeriod(p.start,p.end)+'分を計算します。</p>'+clampText+holidayText+'<p>'+esc(missingNote)+'</p>');
+      var fallbackCard=renderUploadCard(id,p,holidays,missingNote);
+      thread.appendChild(fallbackCard);
+      scrollRequestIntoView(user);
+      return;
+    }
+    addMessage('assistant','<p>'+fmtPeriod(p.start,p.end)+'分を計算します。</p>'+clampText+holidayText+'<p>Excel出勤簿を添付して計算してください。</p>');
+    var card=renderUploadCard(id,p,holidays,null);
+    thread.appendChild(card);
+    scrollRequestIntoView(user);
+  }
+  function renderBusyCard(id,period,title){
+    var card=document.createElement('section');card.className='upload-card busy-card';card.dataset.request=String(id);
+    card.innerHTML='<div class="card-heading"><h2>'+esc(title)+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="busy-status">ファイルの日付範囲を判定して計算しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p>';
+    return card;
+  }
+  async function calculateFromAttached(id,period,holidays,isTaka,files,busyCard){
+    try{
+      var result;
+      if(isTaka){
+        var dist=await distributeTakaFiles(files,period,holidays);
+        result=await calculateTaka(dist.termFiles,dist.lookbackGroups,dist.holidayGroups,period,holidays);
+      }else{
+        var distS=await distributeSuzuyaFiles(files,period,holidays);
+        result=await calculateSuzuya(distS.termFiles,distS.lookbackGroups,period,holidays);
+      }
+      if(id!==state.requestId)return;
+      if(busyCard&&busyCard.parentNode)busyCard.remove();
+      renderResults(result,period,holidays);
+    }catch(err){
+      if(id!==state.requestId)return;
+      console.error(err);
+      var message=err&&err.message?err.message:'ファイルを読み取れませんでした';
+      if(busyCard){
+        busyCard.innerHTML='<div class="card-heading"><h2>添付ファイルで計算できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><p class="notice">ファイルを確認して、もう一度クリップボタンから添付して期間と一緒に送信してください。</p>';
+        scrollResultTop(busyCard);
+      }
+    }
+  }
+  async function takaFileRange(file){
+    try{
+      var rows=parseCSV(await readText(file));
+      var hi=rows.findIndex(function(r){return String(r[0]||'').trim()==='Name'});
+      if(hi<0)return null;
+      var headers=rows[hi].map(function(x){return String(x||'').trim()});
+      var clockI=headers.indexOf('Clock in');if(clockI<0)return null;
+      var min=null,max=null,dates={};
+      rows.slice(hi+1).forEach(function(r){var d=parseCSVDate(r[clockI]);if(!d)return;dates[key(d)]=true;if(!min||d<min)min=d;if(!max||d>max)max=d});
+      if(!min)return null;
+      return {min:min,max:max,dates:dates};
+    }catch(e){return null}
+  }
+  async function suzuyaFileRange(file){
+    try{
+      var bundle=await loadSuzuya([file]);
+      var ks=Object.keys(bundle.daily||{}).reduce(function(acc,name){return acc.concat(Object.keys(bundle.daily[name]||{}))},[]);
+      if(!ks.length)return null;
+      ks.sort();var min=new Date(ks[0]+'T12:00:00'),max=new Date(ks[ks.length-1]+'T12:00:00');
+      var dates={};ks.forEach(function(k){dates[k]=true});
+      return {min:min,max:max,dates:dates};
+    }catch(e){return null}
+  }
+  function overlapsRange(range,start,end){if(!range)return true;return range.max>=start&&range.min<=end}
+  async function distributeTakaFiles(files,period,holidays){
+    var entries=[];
+    for(var i=0;i<files.length;i++){entries.push({file:files[i],range:await takaFileRange(files[i])})}
+    function pick(start,end){return entries.filter(function(e){return overlapsRange(e.range,start,end)}).map(function(e){return e.file})}
+    var termFiles=pick(period.start,period.end);if(!termFiles.length)termFiles=files.slice();
+    var lookbackGroups=holidays.map(function(h){return pick(addDays(h.date,-30),addDays(h.date,-1))});
+    var holidayGroups=holidays.map(function(h){return pick(h.date,h.date)});
+    return {termFiles:termFiles,lookbackGroups:lookbackGroups,holidayGroups:holidayGroups};
+  }
+  async function distributeSuzuyaFiles(files,period,holidays){
+    var entries=[];
+    for(var i=0;i<files.length;i++){entries.push({file:files[i],range:await suzuyaFileRange(files[i])})}
+    function pick(start,end){return entries.filter(function(e){return overlapsRange(e.range,start,end)}).map(function(e){return e.file})}
+    var termFiles=pick(period.start,period.end);if(!termFiles.length)termFiles=files.slice();
+    var lookbackGroups=holidays.map(function(h){var g=pick(addDays(h.date,-30),addDays(h.date,-1));return g.length?g:files.slice()});
+    return {termFiles:termFiles,lookbackGroups:lookbackGroups};
+  }
+
+  function renderUploadCard(id,period,holidays,fallbackNote){
+    var card=document.createElement('section');card.className='upload-card';card.dataset.request=String(id);
+    var isTaka=state.store==='taka';
+    var hasToken=Boolean(state.settings.apifyToken),autoReady=isTaka&&hasToken&&state.settings.actorId&&state.settings.accountName&&state.settings.password&&state.settings.storeId;
+    var accept=isTaka?'.csv,text/csv':'.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+    var priorityHtml='';
+    if(isTaka&&autoReady){
+      priorityHtml='<div class="priority-box"><strong>計算方法の優先順位</strong><ol><li><strong>ファイルあり → そのファイルで計算</strong>（下でまとめて添付して「ファイルで計算」）</li><li><strong>ファイルなし → 自動取得で計算</strong>（下の「ファイルなしで自動取得する」）</li></ol></div>';
+    }else if(isTaka){
+      priorityHtml='<div class="priority-box"><strong>ファイルで計算します</strong><br>CSVファイルをまとめて添付してください。祝日用と通常用に分ける必要はありません。ファイルの日付範囲を自動で判定し、給与期間用・祝日判定用に振り分けます。<br><span style="font-size:12px;opacity:.9">設定が未入力のため、自動取得は使えません。ファイルで計算してください。</span></div>';
+    }else{
+      priorityHtml='';
+    }
+    var boxes=isTaka?'<label class="filebox" id="termBox'+id+'"><input id="termFile'+id+'" type="file" accept="'+accept+'" multiple><span class="file-title">CSVファイル（複数可・まとめて選択）</span><span class="file-help">タップしてファイルをまとめて選んでください。給与期間用と祝日判定用に分ける必要はありません。アップロードされたファイルの日付範囲を自動で判定し、必要な期間に振り分けます。複数ファイルを同時に選択できます。</span><span class="file-name" id="termName'+id+'">未選択 — まだファイルは添付されていません</span></label>':'<label class="filebox" id="termBox'+id+'"><input id="termFile'+id+'" type="file" accept="'+accept+'" multiple><span class="file-title">Excel出勤簿ファイル</span><span class="file-name" id="termName'+id+'">未選択 — まだファイルは添付されていません</span></label>';
+    var note=fallbackNote?'<p class="notice">'+esc(fallbackNote)+'</p>':'';
+    var autoHtml='';
+    if(isTaka&&autoReady){
+      autoHtml='<div class="or-divider">または</div><div class="auto-box"><span class="auto-box-title">ファイルがない場合 — 自動取得で計算</span><span class="auto-box-help">ファイルを添付せず、GoSnappyから自動で取得して計算します。ファイルが添付されている場合は、そちらが優先されるため、このボタンは使いません。</span><button type="button" class="secondary" id="auto'+id+'">ファイルなしで自動取得する</button><span class="status" id="autoStatus'+id+'" style="margin-left:9px"></span></div>';
+    }
+    card.innerHTML='<div class="card-heading"><h2>'+esc(isTaka?'Ramen Taka':'suzuya')+(isTaka?' — ファイル優先／なければ自動取得':' — Excelファイルで計算')+'</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div>'+priorityHtml+note+'<div class="upload-grid">'+boxes+'</div>'+(isTaka?'<p class="notice"><strong>集計ルール：</strong>給与期間は各CSVの右端「Total」列をそのまま使用します。</p>':'')+'<div class="action-row"><button type="button" class="primary" id="calc'+id+'" disabled>ファイルで計算する</button><span class="status" id="status'+id+'">ファイルを選択すると「ファイルで計算する」が押せます</span></div>'+autoHtml;
+    setTimeout(function(){wireCard(id,isTaka,period,holidays)},0);return card;
+  }
+  function wireCard(id,isTaka,period,holidays){
+    var term=document.getElementById('termFile'+id),btn=document.getElementById('calc'+id),status=document.getElementById('status'+id);
+    var autoBtn=document.getElementById('auto'+id);
+    function refresh(){var ready=!!(term&&term.files&&term.files.length);btn.disabled=!ready;status.textContent=ready?'ファイルが添付されました。日付範囲を自動で判定して計算します':'ファイルを選択すると「ファイルで計算する」が押せます';status.className='status';if(autoBtn){autoBtn.disabled=!!term.files.length;var as=document.getElementById('autoStatus'+id);if(as)as.textContent=term.files.length?'ファイルが添付されているため、ファイルが優先されます':''}}
+    function update(){var fs=Array.from(term.files||[]);document.getElementById('termName'+id).textContent=fs.length?('選択中（'+fs.length+'件）：'+fs.map(function(f){return f.name}).join('、')):'未選択 — まだファイルは添付されていません';var box=document.getElementById('termBox'+id);if(box)box.classList.toggle('has-file',fs.length>0);refresh()}
+    term.addEventListener('change',update);
+    btn.addEventListener('click',async function(){
+      btn.disabled=true;if(autoBtn)autoBtn.disabled=true;status.textContent='添付ファイルの日付範囲を判定して計算しています…';status.className='status';
+      try{
+        var files=Array.from(term.files),result;
+        if(isTaka){var dist=await distributeTakaFiles(files,period,holidays);result=await calculateTaka(dist.termFiles,dist.lookbackGroups,dist.holidayGroups,period,holidays)}
+        else{var distS=await distributeSuzuyaFiles(files,period,holidays);result=await calculateSuzuya(distS.termFiles,distS.lookbackGroups,period,holidays)}
+        if(id!==state.requestId)return;renderResults(result,period,holidays);status.textContent='添付ファイルで計算が完了しました';
+      }catch(err){console.error(err);status.textContent=err&&err.message?err.message:'ファイルを読み取れませんでした';status.className='status error';btn.disabled=false;refresh()}
+    });
+    if(autoBtn){
+      autoBtn.addEventListener('click',function(){
+        if(term.files.length){var as2=document.getElementById('autoStatus'+id);if(as2)as2.textContent='ファイルが添付されているため、ファイルで計算してください';return}
+        var cardEl=btn.closest('.upload-card');if(!cardEl)return;
+        var busy=renderAutoCard(id,period);
+        cardEl.replaceWith(busy);
+        startAutoCalculation(id,period,holidays,busy);
+      });
+    }
+    refresh();
+  }
+
+  function renderAutoCard(id,period){
+    var card=document.createElement('section');card.className='upload-card busy-card';card.dataset.request=String(id);
+    card.innerHTML='<div class="card-heading"><h2>ファイルなし — 自動取得で計算中</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice" style="margin:0 0 12px">ファイルが添付されなかったため、GoSnappyから自動取得して計算します。</p><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="auto-status">勤務データを取得しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p>';
+    return card;
+  }
+  async function apifyJson(url,settings,init){
+    var response;
+    try{response=await fetch(url,Object.assign({},init||{},{headers:Object.assign({'Authorization':'Bearer '+settings.apifyToken,'Accept':'application/json'},init&&init.body?{'Content-Type':'application/json'}:{})}))}
+    catch(e){throw new Error('自動取得サービスに接続できませんでした。通信状態を確認してください。')}
+    var payload=null;try{payload=await response.json()}catch(e){}
+    if(!response.ok){
+      var detail=payload&&payload.error&&(payload.error.message||payload.error.type)?String(payload.error.message||payload.error.type):'';
+      var suffix=detail?'（'+detail+'）':'';
+      if(response.status===401||response.status===403)throw new Error('認証情報を確認してください。'+suffix);
+      if(response.status===402)throw new Error('Apifyの利用枠（クレジット）不足のため、自動取得を開始できませんでした。Apifyの契約・残高を確認してください。'+suffix);
+      throw new Error('勤務データの取得に失敗しました（'+response.status+'）。'+suffix);
+    }
+    return payload;
+  }
+  async function fetchApifyCsv(settings,start,end){
+    var base='https://api.apify.com/v2',payload=await apifyJson(base+'/acts/'+encodeURIComponent(APIFY_ACTOR_ID)+'/runs?timeout=900',settings,{method:'POST',body:JSON.stringify({accountName:settings.accountName,password:settings.password,storeId:settings.storeId,startDate:isoDate(start),endDate:isoDate(end)})});
+    var run=payload&&payload.data;if(!run||!run.id)throw new Error('自動取得を開始できませんでした。接続設定を確認してください。');
+    var datasetId=run.defaultDatasetId||null;
+    for(var attempt=0;attempt<180;attempt++){
+      await wait(3000);var statusPayload=await apifyJson(base+'/actor-runs/'+encodeURIComponent(run.id),settings),info=statusPayload&&statusPayload.data,status=info&&info.status;
+      if(info&&info.defaultDatasetId)datasetId=info.defaultDatasetId;
+      if(status==='SUCCEEDED')break;
+      if(status==='FAILED'||status==='ABORTED'||status==='TIMED-OUT')throw new Error('勤務データの取得に失敗しました（'+status+'）。');
+      if(attempt===179)throw new Error('勤務データの取得に時間がかかっています。手動ファイルで計算してください。');
+    }
+    if(!datasetId)throw new Error('取得した勤務データを確認できませんでした。');
+    var items=await apifyJson(base+'/datasets/'+encodeURIComponent(datasetId)+'/items?clean=true&format=json',settings),item=Array.isArray(items)?items.find(function(x){return x&&typeof x.csv==='string'&&x.csv.trim()}):null;
+    if(!item)throw new Error('取得したデータにCSV本文がありませんでした。');
+    return new File([item.csv],'gosnappy_'+isoDate(start)+'_to_'+isoDate(end)+'.csv',{type:'text/csv'});
+  }
+  async function startAutoCalculation(id,period,holidays,card){
+    var settings={apifyToken:state.settings.apifyToken,actorId:state.settings.actorId,accountName:state.settings.accountName,password:state.settings.password,storeId:state.settings.storeId};
+    try{
+      var needed=[{kind:'term',index:-1,start:period.start,end:period.end}];
+      holidays.forEach(function(h,i){needed.push({kind:'lookback',index:i,start:addDays(h.date,-30),end:addDays(h.date,-1)});needed.push({kind:'holiday',index:i,start:h.date,end:h.date})});
+      var files=[];
+      for(var si=0;si<needed.length;si++){var fetched=await fetchApifyCsv(settings,needed[si].start,needed[si].end);files.push({spec:needed[si],file:fetched})}
+      if(id!==state.requestId)return;
+      var termFiles=[],lookbackGroups=holidays.map(function(){return []}),holidayGroups=holidays.map(function(){return []});
+      files.forEach(function(entry){if(entry.spec.kind==='term')termFiles.push(entry.file);else if(entry.spec.kind==='lookback')lookbackGroups[entry.spec.index].push(entry.file);else holidayGroups[entry.spec.index].push(entry.file)});
+      var status=card.querySelector('.auto-status');if(status)status.textContent='給与を計算しています…';
+      var result=await calculateTaka(termFiles,lookbackGroups,holidayGroups,period,holidays);if(id!==state.requestId)return;
+      card.remove();renderResults(result,period,holidays);
+    }catch(err){
+      if(id!==state.requestId)return;console.error(err);var message=err&&err.message?err.message:'勤務データを取得できませんでした。';
+      card.innerHTML='<div class="card-heading"><h2>自動取得を完了できませんでした</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice">'+esc(message)+'</p><div class="action-row"><button type="button" class="primary auto-fallback">手動ファイルを選ぶ</button></div>';
+      card.querySelector('.auto-fallback').addEventListener('click',function(){var manual=renderUploadCard(id,period,holidays,'自動取得を完了できなかったため、手動ファイルで計算できます。');card.replaceWith(manual)});
+    }
+  }
+
+  function readText(file){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(String(r.result||''))};r.onerror=function(){reject(new Error(file.name+'を読み取れませんでした'))};r.readAsText(file,'UTF-8')})}
+  function parseCSV(text){
+    text=text.replace(/^\uFEFF/,'');var rows=[],row=[],cell='',q=false;
+    for(var i=0;i<text.length;i++){var c=text[i],n=text[i+1];if(q){if(c==='"'&&n==='"'){cell+='"';i++}else if(c==='"')q=false;else cell+=c}else if(c==='"')q=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=c}
+    if(cell||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}return rows;
+  }
+  function dec(v){var m=String(v||'').replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);return m?parseFloat(m[0]):0}
+  function parseCSVDate(v){var m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(20\d{2})/);return m?localDate(+m[3],+m[1],+m[2]):null}
+  async function loadTakaFiles(files){
+    var bundle={totals:{},daily:{},days:{},warnings:[]};
+    for(var fi=0;fi<files.length;fi++){
+      var rows=parseCSV(await readText(files[fi])),hi=rows.findIndex(function(r){return String(r[0]||'').trim()==='Name'});if(hi<0)throw new Error(files[fi].name+'にNameヘッダーがありません');
+      var headers=rows[hi].map(function(x){return String(x||'').trim()}),nameI=headers.indexOf('Name'),clockI=headers.indexOf('Clock in'),netI=headers.indexOf('Net Shift Duration');
+      var totalI=-1;for(var z=headers.length-1;z>=0;z--){if(headers[z]==='Total'){totalI=z;break}}
+      if(nameI<0||clockI<0||netI<0||totalI<0)throw new Error(files[fi].name+'に必要な列がありません');
+      var fileTotals={};
+      rows.slice(hi+1).forEach(function(r){var name=String(r[nameI]||'').trim(),d=parseCSVDate(r[clockI]),net=dec(r[netI]);if(!name||!d||net<=0)return;if(!bundle.daily[name])bundle.daily[name]={};if(!bundle.days[name])bundle.days[name]={};bundle.daily[name][key(d)]=(bundle.daily[name][key(d)]||0)+net;bundle.days[name][key(d)]=true;if(fileTotals[name]==null&&String(r[totalI]||'').trim())fileTotals[name]=dec(r[totalI])});
+      Object.keys(fileTotals).forEach(function(name){bundle.totals[name]=(bundle.totals[name]||0)+fileTotals[name]});
+    }return bundle;
+  }
+  async function calculateTaka(termFiles,lbGroups,holidayGroups,period,holidays){
+    var hs=holidays||state.holidays,term=await loadTakaFiles(termFiles),lookbacks=[],holidayData=[];
+    for(var i=0;i<lbGroups.length;i++)lookbacks.push(await loadTakaFiles(lbGroups[i]));
+    if(holidayGroups){for(var j=0;j<holidayGroups.length;j++)holidayData.push(holidayGroups[j]&&holidayGroups[j].length?await loadTakaFiles(holidayGroups[j]):term)}
+    var pool=Object.keys(term.totals).concat(Object.keys(term.daily));lookbacks.forEach(function(lb){pool=pool.concat(Object.keys(lb.totals),Object.keys(lb.daily))});holidayData.forEach(function(hd){pool=pool.concat(Object.keys(hd.daily))});
+    var names=Array.from(new Set(pool)).sort();if(!names.length)throw new Error('勤務データが見つかりませんでした');
+    var rows=names.map(function(name){var details=hs.map(function(h,i){var lb=lookbacks[i]||{totals:{},daily:{},days:{}},hd=holidayData[i]||term,ws=addDays(h.date,-30),we=addDays(h.date,-1),days=0;Object.keys(lb.days[name]||{}).forEach(function(k){var d=new Date(k+'T12:00:00');if(d>=ws&&d<=we)days++});var eligible=days>=15;if(!eligible)return {name:h.name,date:h.date,days:days,eligible:false,average:null,holidayHours:null,premium:null};var hol=(hd.daily[name]&&hd.daily[name][key(h.date)])||0;return {name:h.name,date:h.date,days:days,eligible:true,average:days?round2((lb.totals[name]||0)/days):0,holidayHours:round2(hol),premium:round2(hol*.5)}});var p2=period||state.period,wd=0;Object.keys(term.days[name]||{}).forEach(function(k){var dd=new Date(k+'T12:00:00');if(!p2||(dd>=p2.start&&dd<=p2.end))wd++});return {name:name,total:round2(term.totals[name]||0),workDays:wd,holidays:details}});
+    return {rows:rows,warnings:term.warnings||[]};
+  }
+
+  function excelDate(v){
+    if(v instanceof Date&&!isNaN(v)){if(v.getFullYear()<2000)return null;return localDate(v.getFullYear(),v.getMonth()+1,v.getDate())}
+    if(typeof v==='number'&&v>20000){var o=XLSX.SSF.parse_date_code(v);if(o)return localDate(o.y,o.m,o.d)}
+    var m=String(v||'').match(/(20\d{2})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);return m?localDate(+m[1],+m[2],+m[3]):null;
+  }
+  function durationMinutes(v){
+    if(typeof v==='number')return Math.round(v*24*60);
+    if(v instanceof Date)return v.getHours()*60+v.getMinutes();
+    var m=String(v||'').match(/(\d+)\s*[:：]\s*(\d{1,2})/);return m?(+m[1]*60 + +m[2]):0;
+  }
+  function norm(v){return String(v==null?'':v).replace(/[\n\s　]/g,'')}
+  function toDec(totalMin){var h=Math.floor(totalMin/60),m=Math.round(totalMin%60);return round2(h+CONV[m])}
+  function readArray(file){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(r.result)};r.onerror=function(){reject(new Error(file.name+'を読み取れませんでした'))};r.readAsArrayBuffer(file)})}
+  async function loadSuzuya(files){
+    if(typeof XLSX==='undefined')throw new Error('Excel読取ライブラリを読み込めませんでした');var out={daily:{},warnings:[]};
+    for(var fi=0;fi<files.length;fi++){
+      var wb=XLSX.read(await readArray(files[fi]),{type:'array'});
+      wb.SheetNames.forEach(function(sn){var matrix=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null}),hr=-1,wc=-1;
+        for(var r=0;r<Math.min(15,matrix.length);r++)for(var c=0;c<Math.min(20,(matrix[r]||[]).length);c++)if(norm(matrix[r][c])==='勤務時間'){hr=r;wc=c;break}
+        var name=null;for(var c2=0;c2<Math.min(16,(matrix[2]||[]).length);c2++)if(norm(matrix[2][c2])==='名前'){name=matrix[2][c2+1]?String(matrix[2][c2+1]).trim():'';break}
+        if(name===null)name=sn;
+        if(hr<0||!name)return;var dc=-1;for(var c3=0;c3<Math.min(10,(matrix[hr]||[]).length);c3++){for(var r2=hr+1;r2<Math.min(hr+40,matrix.length);r2++)if(excelDate((matrix[r2]||[])[c3])){dc=c3;break}if(dc>=0)break}if(dc<0)return;if(!out.daily[name])out.daily[name]={};
+        for(var rr=hr+1;rr<Math.min(hr+40,matrix.length);rr++){var row=matrix[rr]||[],d=excelDate(row[dc]);if(!d)continue;var mins=durationMinutes(row[wc]);if(mins>0)out.daily[name][key(d)]=(out.daily[name][key(d)]||0)+mins;else if(row[wc]==null&&row[Math.max(0,wc-5)]!=null)out.warnings.push(name+' '+fmtDate(d)+'：始業あり・勤務時間なし（0として集計）')}
+      });
+    }return out;
+  }
+  function sumMinutes(daily,start,end){var total=0,days=0;Object.keys(daily||{}).forEach(function(k){var d=new Date(k+'T12:00:00');if(d>=start&&d<=end&&daily[k]>0){total+=daily[k];days++}});return {minutes:total,days:days}}
+  async function calculateSuzuya(termFiles,lbGroups,period,holidays){
+    var p=period||state.period,hs=holidays||state.holidays,term=await loadSuzuya(termFiles),lookbacks=[];for(var i=0;i<lbGroups.length;i++)lookbacks.push(await loadSuzuya(lbGroups[i]));var pool=Object.keys(term.daily);lookbacks.forEach(function(lb){pool=pool.concat(Object.keys(lb.daily))});var names=Array.from(new Set(pool)).sort();if(!names.length)throw new Error('勤務データが見つかりませんでした');
+    var rows=names.map(function(name){var t=sumMinutes(term.daily[name],p.start,p.end),details=hs.map(function(h,i){var lb=lookbacks[i]||term,look=sumMinutes(lb.daily[name],addDays(h.date,-30),addDays(h.date,-1)),eligible=look.days>=15;if(!eligible)return {name:h.name,date:h.date,days:look.days,eligible:false,average:null,holidayHours:null,premium:null};var holMin=(term.daily[name]&&term.daily[name][key(h.date)])||0;return {name:h.name,date:h.date,days:look.days,eligible:true,average:round2(toDec(look.minutes)/look.days),holidayHours:toDec(holMin),premium:round2(toDec(holMin)*.5)}});return {name:name,total:toDec(t.minutes),workDays:t.days,hm:Math.floor(t.minutes/60)+':'+pad(t.minutes%60),holidays:details}});
+    var warnings=(term.warnings||[]).slice();lookbacks.forEach(function(lb){warnings=warnings.concat(lb.warnings||[])});return {rows:rows,warnings:Array.from(new Set(warnings))};
+  }
+  function round2(n){return Math.round((n+Number.EPSILON)*100)/100}
+
+  function isEligibleRow(r){return (r.holidays||[]).some(function(h){return h.eligible})}
+  function employeeCardHtml(r,holiday,showHolidayDetails){
+    var daysBadge=(r.workDays!=null)?'<span class="work-days">'+r.workDays+'日勤務</span>':'';
+    var html='<article class="employee"><div class="employee-head"><span class="employee-title"><span class="employee-name">'+esc(r.name)+'</span>'+daysBadge+'</span><span class="hours">'+r.total.toFixed(2)+'時間</span></div>';
+    if(r.hm)html+='<div class="metrics"><div class="metric"><span class="metric-label">合計（時:分）</span><span class="metric-value">'+esc(r.hm)+'</span></div></div>';
+    if(holiday&&showHolidayDetails){
+      (r.holidays||[]).forEach(function(h){
+        if(h.eligible){
+          html+='<div class="holiday-detail"><p class="holiday-title">'+esc(h.name)+'（'+fmtDate(h.date)+'）</p><div class="metrics"><div class="metric"><span class="metric-label">過去30日の出勤</span><span class="metric-value">'+h.days+'日</span></div><div class="metric"><span class="metric-label">対象</span><span class="metric-value eligible">対象</span></div><div class="metric"><span class="metric-label">平均日時間</span><span class="metric-value">'+(h.average!=null?h.average.toFixed(2):'0.00')+'時間</span></div><div class="metric"><span class="metric-label">追加0.5倍分</span><span class="metric-value">'+(h.premium!=null?h.premium.toFixed(2):'0.00')+'時間</span></div></div></div>';
+        }else{
+          html+='<div class="holiday-detail"><p class="holiday-title">'+esc(h.name)+'（'+fmtDate(h.date)+'）</p><div class="metrics"><div class="metric"><span class="metric-label">過去30日の出勤</span><span class="metric-value">'+h.days+'日</span></div><div class="metric"><span class="metric-label">対象</span><span class="metric-value not-eligible">対象外</span></div></div></div>';
+        }
+      });
+    }
+    html+='</article>';return html;
+  }
+  function renderResults(result,period,holidays){
+    var p=period||state.period,holiday=(holidays||state.holidays).length>0,card=document.createElement('section');card.className='result-card';
+    var eligibleRows=result.rows,nonEligibleRows=[];
+    if(holiday){
+      eligibleRows=result.rows.filter(function(r){return isEligibleRow(r)});
+      nonEligibleRows=result.rows.filter(function(r){return !isEligibleRow(r)});
+    }
+    var html='<h2 class="result-intro">'+fmtPeriod(p.start,p.end)+'分の計算結果は以下の通りです。</h2><p class="result-summary">'+(holiday?'祝日手当は、祝日前30日間に15日以上勤務した方のみ計算しています。対象外の方は勤務日数と合計時間のみを一番下にまとめています。':'期間内に対象の祝日はないため、通常勤務時間を集計しました。')+'</p>';
+    if(holiday&&eligibleRows.length&&nonEligibleRows.length){
+      html+='<h3 class="group-heading">対象者</h3>';
+    }
+    html+='<div class="results">';
+    if(eligibleRows.length){
+      eligibleRows.forEach(function(r){html+=employeeCardHtml(r,holiday,true)});
+    }else if(holiday){
+      html+='<p class="result-summary" style="margin:0">対象者はいません。</p>';
+    }else{
+      result.rows.forEach(function(r){html+=employeeCardHtml(r,false,false)});
+    }
+    html+='</div>';
+    if(holiday&&nonEligibleRows.length){
+      html+='<div class="group-section"><h3 class="group-heading">対象外 <span class="group-note">祝日前30日で15日未満のため、勤務日数と合計時間のみ表示</span></h3><div class="results">';
+      nonEligibleRows.forEach(function(r){html+=employeeCardHtml(r,holiday,false)});
+      html+='</div></div>';
+    }
+    if(result.warnings&&result.warnings.length)html+='<div class="warnings"><strong>確認事項</strong><ul>'+result.warnings.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul></div>';
+    card.innerHTML=html;thread.appendChild(card);scrollResultTop(card);
+  }
+
+  var SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition,recognition=null;
+  if(SpeechRecognition){recognition=new SpeechRecognition();recognition.lang='ja-JP';recognition.interimResults=true;recognition.continuous=false;recognition.onstart=function(){voiceBtn.classList.add('active');voiceBtn.setAttribute('aria-label','音声入力を停止')};recognition.onresult=function(e){var t='';for(var i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;input.value=t;input.focus()};recognition.onend=function(){voiceBtn.classList.remove('active');voiceBtn.setAttribute('aria-label','音声で入力')};recognition.onerror=function(){voiceBtn.classList.remove('active')}}else{voiceBtn.title='このブラウザは音声入力に対応していません'}
+  voiceBtn.addEventListener('click',function(){if(!recognition)return;try{if(voiceBtn.classList.contains('active'))recognition.stop();else recognition.start()}catch(e){}});
+})();
+</script>
+</body>
+</html>
