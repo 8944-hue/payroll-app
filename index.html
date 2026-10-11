@@ -10,7 +10,7 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg:#0b100e; --panel:#131916; --panel-2:#1b2420; --text:#edf4f0; --muted:#9aa8a0;
+      --bg:#000000; --panel:#000000; --panel-2:#1b2420; --text:#edf4f0; --muted:#9aa8a0;
       --line:#2a352f; --accent:#5ed0a5; --accent-2:#193c30; --accent-text:#c8f7e6;
       --user:#d5f6e8; --user-text:#10221b; --danger:#ff8585; --warning:#e9bb5a;
       --shadow:0 22px 60px rgba(0,0,0,.32); --focus:#6fe0b7;
@@ -18,7 +18,7 @@
     @media (prefers-color-scheme: light) {
       :root {
         color-scheme:dark;
-        --bg:#111714; --panel:#19211d; --panel-2:#222d28; --text:#f2f7f4; --muted:#aab7b0;
+        --bg:#000000; --panel:#000000; --panel-2:#222d28; --text:#f2f7f4; --muted:#aab7b0;
         --line:#334139; --accent:#6cdbb2; --accent-2:#1f4537; --accent-text:#d6faec;
         --user:#ddf8ed; --user-text:#10221b; --danger:#ff9090; --warning:#efc36b;
         --shadow:0 18px 50px rgba(0,0,0,.25); --focus:#7ae6bf;
@@ -131,14 +131,14 @@
     .settings-actions{display:flex;align-items:center;gap:10px;margin-top:3px}
     .settings-feedback{font-size:12px;color:var(--accent)}
     .composer-shell{padding:9px 14px calc(9px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel);z-index:4}
-    .attach-preview{width:100%;max-width:none;margin:0 0 8px;display:flex;flex-wrap:wrap;gap:6px}
+    .attach-preview{width:100%;max-width:720px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:6px}
     .attach-preview[hidden]{display:none}
     .file-chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-2);color:var(--accent-text);border:1px solid var(--line);border-radius:999px;padding:4px 5px 4px 10px;font-size:12px;max-width:100%}
     .file-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;font-weight:700}
     .file-chip-remove{border:0;background:transparent;color:inherit;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;cursor:pointer;padding:0}
     .file-chip-remove svg{width:13px;height:13px}
     .attach-note{font-size:11px;color:var(--muted);align-self:center}
-    .composer{width:100%;max-width:none;margin:0;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:end;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:6px}
+    .composer{width:100%;max-width:720px;margin:0 auto;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:end;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:6px}
     .composer:focus-within{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 20%,transparent)}
     .voice,.attach,.send{width:40px;height:40px;border:0;background:transparent;border-radius:8px;display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
     .attach:hover,.voice:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
