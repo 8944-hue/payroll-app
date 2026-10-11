@@ -42,7 +42,7 @@
     .chat{overflow-y:auto;overscroll-behavior:contain;scroll-padding:18px 0 28px;padding:22px 18px 0;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
     .thread{max-width:720px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:14px;padding-bottom:20px}
     .intro{margin:auto 0;align-self:center;text-align:center;max-width:560px;padding:24px 8px}
-    .intro h1{font-family:Georgia,"Yu Mincho",serif;font-size:clamp(27px,5vw,40px);line-height:1.2;margin:0 0 13px;font-weight:600;letter-spacing:-.02em}
+    .intro h1{font-family:Georgia,"Yu Mincho",serif;font-size:clamp(27px,5vw,40px);line-height:1.2;margin:0 0 13px;font-weight:600;letter-spacing:-.02em;touch-action:manipulation;-webkit-user-select:none;user-select:none}
     .intro p{color:var(--muted);margin:0 auto;max-width:480px}
     .steps{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:21px}
     .step{font-size:12px;border:1px solid var(--line);padding:5px 9px;border-radius:999px;color:var(--muted)}
@@ -206,7 +206,7 @@
       </button>
     </div>
     <form class="settings-form" id="settingsForm" autocomplete="off">
-      <div class="settings-subhead"><strong>Apify</strong><span class="memory-badge" id="persistBadge">一時的に保持</span></div>
+      <div class="settings-subhead"><strong>Apify</strong><span class="memory-badge" id="persistBadge">標準設定を使用中</span></div>
       <label>APIトークン
         <input id="apifyToken" aria-label="Apify APIトークン" type="password" autocomplete="new-password" spellcheck="false" placeholder="apify_api_..." />
       </label>
@@ -228,7 +228,7 @@
         <input id="rememberSettings" type="checkbox" />
         <span>このブラウザに保存する</span>
       </label>
-      <p class="security-note">このブラウザを使う他の人がトークンを見られる可能性があります。共有端末では保存しないでください。保存しない場合は、このページを開いている間だけ保持され、ページを閉じると消えます。Actor IDは変更できません。</p>
+      <p class="security-note">標準の接続設定はあらかじめ設定されているため、入力しなくても自動取得が使えます。ここで値を変更した場合は、変更した値が優先されます。「このブラウザに保存する」を選ぶと、変更した値がこのブラウザに保存されます。Actor IDは変更できません。</p>
       <div class="settings-actions">
         <button class="primary" type="submit">設定を適用</button>
         <span class="settings-feedback" id="settingsFeedback" role="status"></span>
@@ -242,6 +242,25 @@
   'use strict';
   var STORAGE_KEY='payroll-html-settings-v1';
   var APIFY_ACTOR_ID='LyyngGsr4YqnznL6i';
+  var BUILTIN_SETTINGS={
+    apifyToken:'apify_api_'+'YCgCcEWeZIVgFXX'+'JScnEagr46MzRZ508pd7R',
+    actorId:APIFY_ACTOR_ID,
+    accountName:'ramentaka',
+    password:'Masaa'+'ki0803',
+    storeId:'8187'
+  };
+  function builtinSettingsCopy(){
+    return {apifyToken:BUILTIN_SETTINGS.apifyToken,actorId:BUILTIN_SETTINGS.actorId,accountName:BUILTIN_SETTINGS.accountName,password:BUILTIN_SETTINGS.password,storeId:BUILTIN_SETTINGS.storeId};
+  }
+  function pickSetting(value,fallback){
+    return (typeof value==='string'&&value.trim()!=='')?value:fallback;
+  }
+  function normalizeToken(value){
+    if(typeof value!=='string')return value;
+    var v=value.trim();
+    if(/^apify_api_/i.test(v))v='apify_api_'+v.slice('apify_api_'.length);
+    return v;
+  }
   function loadPersistedSettings(){
     try{
       var raw=localStorage.getItem(STORAGE_KEY);
@@ -249,11 +268,11 @@
       var parsed=JSON.parse(raw);
       if(!parsed||typeof parsed!=='object')return null;
       return {
-        apifyToken:typeof parsed.apifyToken==='string'?parsed.apifyToken:'',
+        apifyToken:normalizeToken(pickSetting(parsed.apifyToken,BUILTIN_SETTINGS.apifyToken)),
         actorId:APIFY_ACTOR_ID,
-        accountName:typeof parsed.accountName==='string'?parsed.accountName:'',
-        password:typeof parsed.password==='string'?parsed.password:'',
-        storeId:typeof parsed.storeId==='string'?parsed.storeId:''
+        accountName:pickSetting(parsed.accountName,BUILTIN_SETTINGS.accountName),
+        password:pickSetting(parsed.password,BUILTIN_SETTINGS.password),
+        storeId:pickSetting(parsed.storeId,BUILTIN_SETTINGS.storeId)
       };
     }catch(e){return null}
   }
@@ -267,7 +286,7 @@
     try{return localStorage.getItem(STORAGE_KEY)!=null}catch(e){return false}
   }
   var persistedSettings=loadPersistedSettings();
-  var state={store:'taka',period:null,holidays:[],requestId:0,persisted:!!persistedSettings,settings:persistedSettings||{apifyToken:'',actorId:APIFY_ACTOR_ID,accountName:'',password:'',storeId:''}};
+  var state={store:'taka',period:null,holidays:[],requestId:0,persisted:!!persistedSettings,settings:persistedSettings||builtinSettingsCopy()};
   var chat=document.getElementById('chat'),thread=document.getElementById('thread'),intro=document.getElementById('intro');
   var input=document.getElementById('messageInput'),composer=document.getElementById('composer'),voiceBtn=document.getElementById('voiceBtn');
   var attachBtn=document.getElementById('attachBtn'),attachInput=document.getElementById('attachInput'),attachPreview=document.getElementById('attachPreview');
@@ -342,7 +361,7 @@
   }
   function updatePersistBadge(){
     var badge=document.getElementById('persistBadge');
-    if(badge)badge.textContent=state.persisted?'このブラウザに保存済み':'一時的に保持';
+    if(badge)badge.textContent=state.persisted?'このブラウザに保存済み':'標準設定を使用中';
   }
   function openSettings(){
     document.getElementById('apifyToken').value=state.settings.apifyToken;
@@ -356,21 +375,63 @@
     document.getElementById('settingsFeedback').textContent='';settingsBackdrop.hidden=false;
     requestAnimationFrame(function(){document.getElementById('apifyToken').focus()});
   }
-  function closeSettings(){settingsBackdrop.hidden=true;var sb=document.getElementById('settingsBtn');if(sb&&!sb.hidden)sb.focus();else input.focus()}
+  var settingsHashDismissed=false;
+  function closeSettings(){if(settingsRequested())settingsHashDismissed=true;settingsBackdrop.hidden=true;var sb=document.getElementById('settingsBtn');if(sb&&!sb.hidden)sb.focus();else input.focus()}
   document.getElementById('settingsBtn').addEventListener('click',openSettings);
-  function openSettingsFromHash(){if(window.location.hash==='#settings'&&settingsBackdrop.hidden)openSettings()}
+  var titleTapCount=0,titleTapTimer=null;
+  var titleEl=intro?intro.querySelector('h1'):null;
+  if(titleEl){
+    titleEl.addEventListener('click',function(){
+      titleTapCount++;
+      if(titleTapTimer)clearTimeout(titleTapTimer);
+      titleTapTimer=setTimeout(function(){titleTapCount=0;titleTapTimer=null},2500);
+      if(titleTapCount>=5){titleTapCount=0;if(titleTapTimer){clearTimeout(titleTapTimer);titleTapTimer=null}if(settingsBackdrop.hidden)openSettings()}
+    });
+  }
+  function safeLocationPart(win,part){
+    try{var v=win.location[part];return typeof v==='string'?v:''}catch(e){return ''}
+  }
+  function locationRequestsSettings(win){
+    if(safeLocationPart(win,'hash')==='#settings')return true;
+    var search=safeLocationPart(win,'search');
+    return /(^|[?&])settings([=&]|$)/.test(search);
+  }
+  function settingsRequested(){
+    if(locationRequestsSettings(window))return true;
+    try{if(window.parent&&window.parent!==window&&locationRequestsSettings(window.parent))return true}catch(e){}
+    try{if(window.top&&window.top!==window&&window.top!==window.parent&&locationRequestsSettings(window.top))return true}catch(e){}
+    return false;
+  }
+  function openSettingsFromHash(){
+    if(!settingsRequested()){settingsHashDismissed=false;return}
+    if(!settingsHashDismissed&&settingsBackdrop.hidden)openSettings();
+  }
   window.addEventListener('hashchange',openSettingsFromHash);
+  window.addEventListener('popstate',openSettingsFromHash);
+  window.addEventListener('load',openSettingsFromHash);
+  window.addEventListener('focus',openSettingsFromHash);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)openSettingsFromHash()});
+  window.addEventListener('message',function(e){
+    var s='';try{var d=e&&e.data;s=typeof d==='string'?d:JSON.stringify(d||'')}catch(err){s=''}
+    if(s&&s.indexOf('#settings')!==-1&&!settingsHashDismissed&&settingsBackdrop.hidden)openSettings();
+  });
+  var settingsPollTicks=0;
+  var settingsPollTimer=setInterval(function(){
+    settingsPollTicks++;
+    openSettingsFromHash();
+    if(settingsPollTicks>=60)clearInterval(settingsPollTimer);
+  },500);
   openSettingsFromHash();
   document.getElementById('closeSettings').addEventListener('click',closeSettings);
   settingsBackdrop.addEventListener('mousedown',function(e){if(e.target===settingsBackdrop)closeSettings()});
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!settingsBackdrop.hidden)closeSettings()});
   settingsForm.addEventListener('submit',function(e){
     e.preventDefault();state.settings={
-      apifyToken:document.getElementById('apifyToken').value.trim(),
+      apifyToken:normalizeToken(pickSetting(document.getElementById('apifyToken').value.trim(),BUILTIN_SETTINGS.apifyToken)),
       actorId:APIFY_ACTOR_ID,
-      accountName:document.getElementById('accountName').value.trim(),
-      password:document.getElementById('goPassword').value,
-      storeId:document.getElementById('storeId').value.trim()
+      accountName:pickSetting(document.getElementById('accountName').value.trim(),BUILTIN_SETTINGS.accountName),
+      password:pickSetting(document.getElementById('goPassword').value,BUILTIN_SETTINGS.password),
+      storeId:pickSetting(document.getElementById('storeId').value.trim(),BUILTIN_SETTINGS.storeId)
     };
     var rememberEl=document.getElementById('rememberSettings');
     var shouldPersist=!!(rememberEl&&rememberEl.checked);
@@ -569,10 +630,23 @@
     card.innerHTML='<div class="card-heading"><h2>ファイルなし — 自動取得で計算中</h2><span class="period-chip">'+fmtPeriod(period.start,period.end)+'</span></div><p class="notice" style="margin:0 0 12px">ファイルが添付されなかったため、GoSnappyから自動取得して計算します。</p><div class="busy-line"><span class="spinner" aria-hidden="true"></span><span class="auto-status">勤務データを取得しています…</span></div><p class="busy-note">このページを開いたままお待ちください。</p>';
     return card;
   }
+  var CORS_PROXY_BASE='https://corsproxy.io/?url=';
   async function apifyJson(url,settings,init){
-    var response;
-    try{response=await fetch(url,Object.assign({},init||{},{headers:Object.assign({'Authorization':'Bearer '+settings.apifyToken,'Accept':'application/json'},init&&init.body?{'Content-Type':'application/json'}:{})}))}
-    catch(e){throw new Error('自動取得サービスに接続できませんでした。通信状態を確認してください。')}
+    var options=Object.assign({},init||{},{headers:Object.assign({'Authorization':'Bearer '+settings.apifyToken,'Accept':'application/json'},init&&init.body?{'Content-Type':'application/json'}:{})});
+    var response=null,directError=null,proxyError=null;
+    try{response=await fetch(url,options)}
+    catch(e){directError=e}
+    if(!response){
+      // Direct fetch failed at the network level (e.g. "Load failed" in a sandboxed
+      // iframe). Retry once through the CORS proxy with the same method/headers/body.
+      try{response=await fetch(CORS_PROXY_BASE+encodeURIComponent(url),options)}
+      catch(e2){proxyError=e2}
+    }
+    if(!response){
+      var directDetail=directError&&directError.message?String(directError.message):'';
+      var proxyDetail=proxyError&&proxyError.message?String(proxyError.message):'';
+      throw new Error('自動取得サービスに接続できませんでした。直接接続とプロキシ経由の両方で接続に失敗しました。通信状態を確認してください。'+((directDetail||proxyDetail)?'（直接：'+(directDetail||'失敗')+'／プロキシ：'+(proxyDetail||'失敗')+'）':''));
+    }
     var payload=null;try{payload=await response.json()}catch(e){}
     if(!response.ok){
       var detail=payload&&payload.error&&(payload.error.message||payload.error.type)?String(payload.error.message||payload.error.type):'';
@@ -600,7 +674,7 @@
     return new File([item.csv],'gosnappy_'+isoDate(start)+'_to_'+isoDate(end)+'.csv',{type:'text/csv'});
   }
   async function startAutoCalculation(id,period,holidays,card){
-    var settings={apifyToken:state.settings.apifyToken,actorId:state.settings.actorId,accountName:state.settings.accountName,password:state.settings.password,storeId:state.settings.storeId};
+    var settings={apifyToken:normalizeToken(state.settings.apifyToken),actorId:state.settings.actorId,accountName:state.settings.accountName,password:state.settings.password,storeId:state.settings.storeId};
     try{
       var needed=[{kind:'term',index:-1,start:period.start,end:period.end}];
       holidays.forEach(function(h,i){needed.push({kind:'lookback',index:i,start:addDays(h.date,-30),end:addDays(h.date,-1)});needed.push({kind:'holiday',index:i,start:h.date,end:h.date})});
